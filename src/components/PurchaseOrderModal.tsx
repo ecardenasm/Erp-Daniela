@@ -1,30 +1,59 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { X, AlertCircle } from 'lucide-react';
+import { InventarioApi } from '../infrastructure/adapters/InventarioApiAdapter';
 
 interface PurchaseOrderModalProps {
   isOpen: boolean;
   onClose: () => void;
   material: {
+    id: string;
     name: string;
     quantity: number;
     unit: string;
     supplier?: string;
+    type: 'Solido' | 'Liquido' | 'Envase'; // Asegúrate de incluir 'type'
   };
 }
+
 
 export default function PurchaseOrderModal({ isOpen, onClose, material }: PurchaseOrderModalProps) {
   const [orderQuantity, setOrderQuantity] = useState<number>(1);
   const [error, setError] = useState<string>('');
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const pricePerUnit = 100;
 
   if (!isOpen) return null;
 
-  const handleSubmit = () => {
+  const totalCost = orderQuantity * pricePerUnit;
+
+  const handleSubmit = async () => {
     if (orderQuantity <= 0) {
       setError('La cantidad debe ser mayor a 0');
       return;
     }
-    alert(`Orden creada por ${orderQuantity} ${material.unit} de ${material.name}`);
-    onClose();
+
+    const orderData = {
+      name: material.name,
+      code: material.id, // Utilizamos el `id` como código
+      available_units: material.quantity + orderQuantity, // Unidades disponibles después de la compra
+      max_capacity: material.quantity + orderQuantity + 10, // Ejemplo: capacidad máxima (puede ajustarse según necesidad)
+      type: material.type, // Tipo basado en la unidad
+    };
+
+    console.log('Datos enviados:', orderData);
+
+    setIsLoading(true);
+    try {
+      console.log(orderData)
+      await InventarioApi(`/ingredients/${material.id}`, 'PUT', orderData);
+      console.log('Orden creada con éxito:', orderData);
+      onClose();
+    } catch (err: any) {
+      console.error('Error al crear la orden:', err);
+      setError(err.response?.data?.message || 'Error al crear la orden. Intenta de nuevo.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -45,12 +74,12 @@ export default function PurchaseOrderModal({ isOpen, onClose, material }: Purcha
 
           <div>
             <label className="block text-sm font-medium text-gray-700">Stock Actual</label>
-            <p className="mt-1 text-gray-900">{material.quantity} {material.unit}</p>
+            <p className="mt-1 text-gray-900">{material.quantity} lotes</p>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700">
-              Cantidad a Ordenar ({material.unit})
+              Cantidad a Ordenar (lotes)
             </label>
             <input
               type="number"
@@ -70,6 +99,11 @@ export default function PurchaseOrderModal({ isOpen, onClose, material }: Purcha
             )}
           </div>
 
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Costo Total</label>
+            <p className="mt-1 text-gray-900 font-semibold">{totalCost} USD</p>
+          </div>
+
           {material.supplier && (
             <div>
               <label className="block text-sm font-medium text-gray-700">Proveedor</label>
@@ -81,14 +115,18 @@ export default function PurchaseOrderModal({ isOpen, onClose, material }: Purcha
             <button
               onClick={onClose}
               className="px-4 py-2 border rounded-lg hover:bg-gray-50"
+              disabled={isLoading}
             >
               Cancelar
             </button>
             <button
               onClick={handleSubmit}
-              className="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600"
+              className={`px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 ${
+                isLoading ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+              disabled={isLoading}
             >
-              Crear Orden
+              {isLoading ? 'Creando...' : 'Crear Orden'}
             </button>
           </div>
         </div>
