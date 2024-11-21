@@ -63,7 +63,7 @@ export default function Sidebar({ activeModule, onModuleChange }: SidebarProps) 
       <div className="p-4 border-b dark:border-gray-800 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Citrus className={`w-8 h-8 text-${color}-400`} />
-          {!isCollapsed && <h1 className="text-xl font-bold text-gray-800 dark:text-white">Laura ERP</h1>}
+          {!isCollapsed && <h1 className="text-xl font-bold text-gray-800 dark:text-white">Diana ERP</h1>}
         </div>
         <button 
           onClick={toggleCollapsed}
