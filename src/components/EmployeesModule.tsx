@@ -1,36 +1,32 @@
-import React, { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { HardHat, Clock, Wrench, UserPlus } from 'lucide-react';
 import RequestPersonnelModal from './RequestPersonnelModal';
-
-const employees = [
-  {
-    id: 1,
-    name: 'Juan Pérez',
-    position: 'Operador de Máquina A1',
-    shift: 'Mañana',
-    machine: 'Procesadora Principal',
-    status: 'active'
-  },
-  {
-    id: 2,
-    name: 'María González',
-    position: 'Operador de Máquina B2',
-    shift: 'Tarde',
-    machine: 'Embotelladora',
-    status: 'break'
-  },
-  {
-    id: 3,
-    name: 'Carlos Rodríguez',
-    position: 'Supervisor de Línea',
-    shift: 'Mañana',
-    machine: 'Todas',
-    status: 'active'
-  }
-];
+import { getWorkers } from '../infrastructure/adapters/WorkersApiAdapter'; // Importar la función
 
 export default function EmployeesModule() {
   const [showRequestModal, setShowRequestModal] = useState(false);
+  const [employees, setEmployees] = useState<any[]>([]); // Estado para almacenar los empleados
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Obtener empleados al montar el componente
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      try {
+        const workers = await getWorkers(); // Llamamos al adaptador para obtener los trabajadores
+        setEmployees(workers); // Actualizamos el estado con los trabajadores
+        setLoading(false); // Desactivamos el loading
+      } catch (err: any) {
+        setError('Error al obtener los empleados');
+        setLoading(false);
+      }
+    };
+    
+    fetchEmployees(); // Llamada a la API
+  }, []);
+
+  if (loading) return <div>Cargando empleados...</div>;
+  if (error) return <div>{error}</div>;
 
   return (
     <div className="space-y-6">
@@ -48,15 +44,15 @@ export default function EmployeesModule() {
       <div className="grid grid-cols-3 gap-4">
         <div className="bg-white p-6 rounded-xl shadow-sm">
           <h3 className="text-gray-600 mb-2">Personal Activo</h3>
-          <p className="text-2xl font-bold text-green-600">8</p>
+          <p className="text-2xl font-bold text-green-600">{employees.filter(employee => employee.status === 'active').length}</p>
         </div>
         <div className="bg-white p-6 rounded-xl shadow-sm">
           <h3 className="text-gray-600 mb-2">En Descanso</h3>
-          <p className="text-2xl font-bold text-orange-600">2</p>
+          <p className="text-2xl font-bold text-orange-600">{employees.filter(employee => employee.status === 'break').length}</p>
         </div>
         <div className="bg-white p-6 rounded-xl shadow-sm">
           <h3 className="text-gray-600 mb-2">Total Personal</h3>
-          <p className="text-2xl font-bold">10</p>
+          <p className="text-2xl font-bold">{employees.length}</p>
         </div>
       </div>
 
