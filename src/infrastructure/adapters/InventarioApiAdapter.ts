@@ -1,29 +1,56 @@
-import { api } from '../config'; // Importar la instancia de axios configurada
 
-// Función genérica para hacer peticiones a la API usando la instancia de Axios
-export const InventarioApi = async <T>(
-  endpoint: string,
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET',
-  body?: any
+import { api } from '../config'; // Importar la instancia de Axios configurada
+
+interface RequestOptions {
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE'; // Métodos HTTP permitidos
+  body?: any; // Cuerpo de la petición, opcional
+  headers?: Record<string, string>; // Headers adicionales, opcionales
+}
+
+// Función genérica para manejar peticiones a la API
+export const InventarioApi = async <T = any>(
+  endpoint: string, // Endpoint relativo
+  options: RequestOptions = {}
 ): Promise<T> => {
+  const { method = 'GET', body, headers } = options;
+
+  if (!endpoint || typeof endpoint !== 'string') {
+    throw new Error('El endpoint es requerido y debe ser un string válido.');
+  }
+
+  if (!['GET', 'POST', 'PUT', 'DELETE'].includes(method)) {
+    throw new Error(`Método HTTP no válido: ${method}`);
+  }
+
   try {
     const response = await api.request<T>({
+      url: endpoint,
       method,
-      url: endpoint, // Solo el endpoint porque la baseURL ya está en la configuración
       headers: {
         'Content-Type': 'application/json',
+        ...headers, // Headers personalizados
       },
       data: body,
     });
 
-    return response.data; // Axios ya maneja el parsing del JSON
+    return response.data; // Axios parsea automáticamente la respuesta
   } catch (error: any) {
+    // Manejo avanzado de errores
     if (error.response) {
-      // Error específico del servidor
-      throw new Error(error.response.data?.message || 'Error en la solicitud');
+      // Errores del servidor
+      console.error(
+        `Error del servidor (${error.response.status}):`,
+        error.response.data
+      );
+      throw new Error(error.response.data?.message || 'Error en la solicitud al servidor.');
+    } else if (error.request) {
+      // Errores de red
+      console.error('No se recibió respuesta del servidor:', error.request);
+      throw new Error('No se pudo conectar con el servidor. Verifica tu conexión.');
     } else {
-      // Error de red u otro
-      throw new Error(error.message || 'Error de red o desconocido');
+      // Errores desconocidos
+      console.error('Error desconocido:', error.message);
+      throw new Error(error.message || 'Ocurrió un error desconocido.');
     }
   }
 };

@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, AlertCircle } from 'lucide-react';
 import { InventarioApi } from '../infrastructure/adapters/InventarioApiAdapter';
+import { getSuppliers } from '../infrastructure/adapters/SuppliersApiAdapter';
 
 interface PurchaseOrderModalProps {
   isOpen: boolean;
@@ -11,46 +12,91 @@ interface PurchaseOrderModalProps {
     quantity: number;
     unit: string;
     supplier?: string;
-    type: 'Solido' | 'Liquido' | 'Envase'; // Asegúrate de incluir 'type'
+    type: 'Solido' | 'Liquido' | 'Envase';
   };
 }
 
-
 export default function PurchaseOrderModal({ isOpen, onClose, material }: PurchaseOrderModalProps) {
   const [orderQuantity, setOrderQuantity] = useState<number>(1);
+  const [selectedSupplier, setSelectedSupplier] = useState<number | null>(null);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
   const [error, setError] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const pricePerUnit = 100;
+  const pricePerUnit = 100; // Este precio puede cambiar dinámicamente
 
+  useEffect(() => {
+    const fetchSuppliers = async () => {
+      try {
+        const fetchedSuppliers = await getSuppliers();
+        // Convertimos material.id a número para la comparación
+        const filteredSuppliers = fetchedSuppliers.filter((supplier) =>
+          supplier.ingredients.some((ingredient) => ingredient.ingredient_id === Number(material.id))
+        );
+        setSuppliers(filteredSuppliers);
+      } catch (err) {
+        console.error('Error fetching suppliers:', err);
+        setError('Error al cargar los proveedores.');
+      }
+    };
+    fetchSuppliers();
+  }, [material.id]);
+  
+  
+
+  // Si el modal no está abierto, no renderizar nada
   if (!isOpen) return null;
 
   const totalCost = orderQuantity * pricePerUnit;
 
   const handleSubmit = async () => {
+    // Validaciones básicas
     if (orderQuantity <= 0) {
       setError('La cantidad debe ser mayor a 0');
       return;
     }
 
+    if (!selectedSupplier) {
+      setError('Debe seleccionar un proveedor');
+      return;
+    }
+
+    // Datos a enviar
     const orderData = {
       name: material.name,
-      code: material.id, // Utilizamos el `id` como código
-      available_units: material.quantity + orderQuantity, // Unidades disponibles después de la compra
-      max_capacity: material.quantity + orderQuantity + 10, // Ejemplo: capacidad máxima (puede ajustarse según necesidad)
-      type: material.type, // Tipo basado en la unidad
+      code: material.id,
+      available_units: material.quantity + orderQuantity,
+      max_capacity: material.quantity + orderQuantity + 10,
+      type: material.type,
     };
 
-    console.log('Datos enviados:', orderData);
+    const purchaseData = {
+      supplier_id: selectedSupplier,
+      ingredient_id: material.id,
+      quantity: orderQuantity,
+      value: totalCost,
+    };
 
     setIsLoading(true);
     try {
-      console.log(orderData)
-      await InventarioApi(`/ingredients/${material.id}`, 'PUT', orderData);
-      console.log('Orden creada con éxito:', orderData);
+      // Actualiza el inventario
+      await InventarioApi(`/ingredients/${material.id}`, {
+        method: 'PUT',
+        body: orderData,
+      });
+      console.log('Inventario actualizado:', orderData);
+
+      // Registra la compra
+      await InventarioApi('/ingredients/purchase', {
+        method: 'POST',
+        body: purchaseData,
+      });
+      console.log('Compra registrada:', purchaseData);
+
+      // Cierra el modal
       onClose();
     } catch (err: any) {
-      console.error('Error al crear la orden:', err);
-      setError(err.response?.data?.message || 'Error al crear la orden. Intenta de nuevo.');
+      console.error('Error al procesar la solicitud:', err);
+      setError(err.message || 'Error al procesar la solicitud. Intenta de nuevo.');
     } finally {
       setIsLoading(false);
     }
@@ -104,12 +150,23 @@ export default function PurchaseOrderModal({ isOpen, onClose, material }: Purcha
             <p className="mt-1 text-gray-900 font-semibold">{totalCost} USD</p>
           </div>
 
-          {material.supplier && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Proveedor</label>
-              <p className="mt-1 text-gray-900">{material.supplier}</p>
-            </div>
-          )}
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Proveedor</label>
+            <select
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-yellow-500 focus:ring-yellow-500"
+              value={selectedSupplier || ''}
+              onChange={(e) => setSelectedSupplier(Number(e.target.value))}
+            >
+              <option value="" disabled>
+                Seleccione un proveedor
+              </option>
+              {suppliers.map((supplier) => (
+                <option key={supplier.id} value={supplier.id}>
+                  {supplier.name}
+                </option>
+              ))}
+            </select>
+          </div>
 
           <div className="flex justify-end gap-2 mt-6">
             <button
@@ -126,7 +183,7 @@ export default function PurchaseOrderModal({ isOpen, onClose, material }: Purcha
               }`}
               disabled={isLoading}
             >
-              {isLoading ? 'Creando...' : 'Crear Orden'}
+              {isLoading ? 'Procesando...' : 'Crear Orden'}
             </button>
           </div>
         </div>
