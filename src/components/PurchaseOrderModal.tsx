@@ -22,13 +22,11 @@ export default function PurchaseOrderModal({ isOpen, onClose, material }: Purcha
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [error, setError] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const pricePerUnit = 100; // Este precio puede cambiar dinámicamente
 
   useEffect(() => {
     const fetchSuppliers = async () => {
       try {
         const fetchedSuppliers = await getSuppliers();
-        // Convertimos material.id a número para la comparación
         const filteredSuppliers = fetchedSuppliers.filter((supplier) =>
           supplier.ingredients.some((ingredient) => ingredient.ingredient_id === Number(material.id))
         );
@@ -38,18 +36,15 @@ export default function PurchaseOrderModal({ isOpen, onClose, material }: Purcha
         setError('Error al cargar los proveedores.');
       }
     };
-    fetchSuppliers();
-  }, [material.id]);
-  
-  
+    if (isOpen) fetchSuppliers();
+  }, [material.id, isOpen]);
 
-  // Si el modal no está abierto, no renderizar nada
   if (!isOpen) return null;
 
-  const totalCost = orderQuantity * pricePerUnit;
+  // Asegúrate de que se haga el cálculo solo si hay proveedor seleccionado
+  const totalCost = orderQuantity > 100 ?(orderQuantity*180.6) : (orderQuantity * 250.8)
 
   const handleSubmit = async () => {
-    // Validaciones básicas
     if (orderQuantity <= 0) {
       setError('La cantidad debe ser mayor a 0');
       return;
@@ -60,15 +55,6 @@ export default function PurchaseOrderModal({ isOpen, onClose, material }: Purcha
       return;
     }
 
-    // Datos a enviar
-    const orderData = {
-      name: material.name,
-      code: material.id,
-      available_units: material.quantity + orderQuantity,
-      max_capacity: material.quantity + orderQuantity + 10,
-      type: material.type,
-    };
-
     const purchaseData = {
       supplier_id: selectedSupplier,
       ingredient_id: material.id,
@@ -78,21 +64,14 @@ export default function PurchaseOrderModal({ isOpen, onClose, material }: Purcha
 
     setIsLoading(true);
     try {
-      // Actualiza el inventario
-      await InventarioApi(`/ingredients/${material.id}`, {
-        method: 'PUT',
-        body: orderData,
-      });
-      console.log('Inventario actualizado:', orderData);
-
-      // Registra la compra
       await InventarioApi('/ingredients/purchase', {
         method: 'POST',
-        body: purchaseData,
+        body: JSON.stringify(purchaseData),
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
       console.log('Compra registrada:', purchaseData);
-
-      // Cierra el modal
       onClose();
     } catch (err: any) {
       console.error('Error al procesar la solicitud:', err);
@@ -147,14 +126,14 @@ export default function PurchaseOrderModal({ isOpen, onClose, material }: Purcha
 
           <div>
             <label className="block text-sm font-medium text-gray-700">Costo Total</label>
-            <p className="mt-1 text-gray-900 font-semibold">{totalCost} USD</p>
+            <p className="mt-1 text-gray-900 font-semibold">{totalCost} Pesos</p>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700">Proveedor</label>
             <select
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-yellow-500 focus:ring-yellow-500"
-              value={selectedSupplier || ''}
+              value={selectedSupplier ?? ''}
               onChange={(e) => setSelectedSupplier(Number(e.target.value))}
             >
               <option value="" disabled>
@@ -162,7 +141,7 @@ export default function PurchaseOrderModal({ isOpen, onClose, material }: Purcha
               </option>
               {suppliers.map((supplier) => (
                 <option key={supplier.id} value={supplier.id}>
-                  {supplier.name}
+                  {supplier.name} - {supplier.price_per_unit} USD/lote
                 </option>
               ))}
             </select>
