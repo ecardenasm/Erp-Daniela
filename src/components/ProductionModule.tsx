@@ -1,217 +1,148 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
-import { Play, Pause, AlertCircle } from 'lucide-react';
-import { useProductionStore } from '../store/productionStore';
-import { ProductionMetrics } from './ProductionMetrics';
+import { useState, useEffect } from 'react';
+import { InventarioApi } from '../infrastructure/adapters/InventarioApiAdapter';
 
-const LoadingScreen = lazy(() => import('./LoadingScreen'));
-const OrderSelectionModal = lazy(() => import('./OrderSelectionModal'));
+interface InventoryItem {
+  id: string;
+  name: string;
+  quantity: number;
+  unit: string;
+}
 
-const PRODUCTION_INTERVAL = 50;
-const INITIAL_LOAD_DELAY = 800;
-
-export default function ProductionModule() {
-  const {
-    inventory,
-    currentOrder,
-    isProducing,
-    producedAmount,
-    metrics,
-    setCurrentOrder,
-    setIsProducing,
-    setProducedAmount,
-    incrementInventory,
-    incrementProducedAmount,
-    startProduction,
-    stopProduction,
-    fetchCurrentProduction,
-    fetchMetrics,
-  } = useProductionStore();
-
-  const [isLoading, setIsLoading] = useState(true);
+export default function LemonadeProductionForm() {
+  const [products, setProducts] = useState<InventoryItem[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState<string>('');
+  const [quantity, setQuantity] = useState<number>(0);
+  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [showOrderModal, setShowOrderModal] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [backendUnavailable, setBackendUnavailable] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  // Initial data loading
   useEffect(() => {
-    const initializeProduction = async () => {
+    const fetchProducts = async () => {
       try {
-        await Promise.all([
-          fetchCurrentProduction().catch(() => {
-            console.warn('Modulo de producción no disponible');
-            setBackendUnavailable(true);
-          }),
-          fetchMetrics().catch(() => {
-            console.warn('Métricas no disponibles');
-          }),
-        ]);
-      } catch (err) {
-        setError('Error al cargar los datos de producción');
+        setLoading(true);
+        const response = await InventarioApi<{ products: InventoryItem[] }>('/products', {
+          method: 'GET',
+        });
+        setProducts(response.products || []);
+        setError(null);
+      } catch (err: any) {
+        setError('Error al cargar los productos.');
       } finally {
-        setTimeout(() => setIsLoading(false), INITIAL_LOAD_DELAY);
+        setLoading(false);
       }
     };
-
-    initializeProduction();
-  }, [fetchCurrentProduction, fetchMetrics]);
-
-  // Production process
-  // Production process
-useEffect(() => {
-  if (!isProducing || !currentOrder) return;
-
-  let productionInterval: number; // Cambiado de NodeJS.Timeout a number
   
-  const produce = async () => {
+    fetchProducts();
+  }, []);
+
+  const handleFormSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+  
+    // Validaciones antes de enviar
+    console.log('Iniciando validaciones...');
+    if (!selectedProduct || quantity <= 0) {
+      setError('Por favor, selecciona un producto y especifica una cantidad válida mayor a 0.');
+      console.log('Error de validación: Producto o cantidad no válida');
+      return;
+    }
+  
+    const productId = parseInt(selectedProduct, 10);
+    const quantityInt = parseInt(String(quantity), 10);
+  
+    if (isNaN(productId) || isNaN(quantityInt) || quantityInt <= 0) {
+      setError('El ID del producto o la cantidad no son válidos.');
+      console.log('Error de validación: ID del producto o cantidad no válidos', { productId, quantityInt });
+      return;
+    }
+  
+    console.log('Datos validados:', { productId, quantityInt });
+  
+    setIsSubmitting(true);
+    setError(null);
+  
     try {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          if (producedAmount >= currentOrder.quantity) {
-            stopProduction();
-            setCurrentOrder(null);
-            setProducedAmount(0);
-            return 0;
-          }
-          incrementInventory();
-          incrementProducedAmount();
-          return 0;
-        }
-        return prev + 5;
+      // Construir la URL con parámetros de consulta
+      const url = `/products/production?product_id=${productId}&quantity=${quantityInt}`;
+      console.log('Construyendo URL:', url);
+  
+      const response = await InventarioApi(url, {
+        method: 'POST',
+        headers: {
+          'accept': 'application/json',
+        },
       });
-    } catch (err) {
-      setError('Error en el proceso de producción');
-      stopProduction();
+  
+      console.log('Respuesta recibida:', response);
+  
+      //if (response.success) {
+        //alert(`Producción iniciada para ${quantityInt} unidades del producto con ID ${productId}`);
+      //} else {
+        //setError('Hubo un error al iniciar la producción. Intenta nuevamente.');
+        //console.log('Error en la respuesta del servidor:', response);
+      //}
+    } catch (err: any) {
+//      setError('Hubo un error al procesar la solicitud. Intenta nuevamente.');
+      console.error('Error en la solicitud:', err);
+    } finally {
+      setIsSubmitting(false);
+      console.log('Proceso finalizado.');
     }
   };
-
-  productionInterval = setInterval(produce, PRODUCTION_INTERVAL);
-  return () => clearInterval(productionInterval);
-}, [isProducing, currentOrder, producedAmount, incrementInventory, incrementProducedAmount, stopProduction, setCurrentOrder, setProducedAmount]);
-
-
-  const handleStartProduction = async () => {
-    if (backendUnavailable) {
-      setError('El módulo de producción no está habilitado en el backend');
-      return;
-    }
-    try {
-      if (!currentOrder) {
-        setShowOrderModal(true);
-        return;
-      }
-
-      if (isProducing) {
-        await stopProduction();
-      } else {
-        await startProduction(currentOrder.id);
-      }
-      setError(null);
-    } catch (err) {
-      setError('Error al iniciar/detener la producción');
-    }
-  };
-
-  const handleOrderSelect = async (order: any) => {
-    if (backendUnavailable) {
-      setError('El módulo de producción no está habilitado en el backend');
-      return;
-    }
-    try {
-      setCurrentOrder(order);
-      setProducedAmount(0);
-      setShowOrderModal(false);
-      await startProduction(order.id);
-    } catch (err) {
-      setError('Error al iniciar la producción del pedido');
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <Suspense fallback={null}>
-        <LoadingScreen />
-      </Suspense>
-    );
-  }
+  
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white p-6 rounded-xl shadow-sm">
-        <h2 className="text-xl font-semibold mb-4">Estado de Producción</h2>
+    <div className="max-w-lg mx-auto bg-white p-6 rounded-lg shadow-md space-y-6">
+      <h2 className="text-2xl font-semibold text-gray-800">Producción de Limonada</h2>
+      {loading && <p className="text-gray-500">Cargando productos...</p>}
+      {error && <p className="text-red-600">{error}</p>}
 
-        {error && (
-          <div className="mb-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg flex items-center gap-2">
-            <AlertCircle className="w-5 h-5" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        {backendUnavailable && (
-          <div className="mb-4 bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg">
-            <p className="font-medium">El módulo de producción no está habilitado.</p>
-            <p>Contacte al administrador para habilitar el backend.</p>
-          </div>
-        )}
-
-        <div className="flex items-center justify-between mb-6">
+      {!loading && !error && (
+        <form onSubmit={handleFormSubmit} className="space-y-4">
+          {/* Selección del producto */}
           <div>
-            <p className="text-gray-600">Inventario Actual</p>
-            <p className="text-2xl font-bold">{inventory}</p>
+            <label htmlFor="product" className="block text-sm font-medium text-gray-700">
+              Seleccionar producto
+            </label>
+            <select
+              id="product"
+              value={selectedProduct}
+              onChange={(e) => setSelectedProduct(e.target.value)}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-yellow-500 focus:ring-yellow-500 sm:text-sm"
+            >
+              <option value="">-- Selecciona un producto --</option>
+              {products.map((product) => (
+                <option key={product.id} value={product.id}>
+                  {product.name}
+                </option>
+              ))}
+            </select>
           </div>
+
+          {/* Cantidad a producir */}
+          <div>
+            <label htmlFor="quantity" className="block text-sm font-medium text-gray-700">
+              Cantidad a producir
+            </label>
+            <input
+              type="number"
+              id="quantity"
+              value={quantity}
+              onChange={(e) => setQuantity(Number(e.target.value))}
+              min={1}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-yellow-500 focus:ring-yellow-500 sm:text-sm"
+            />
+          </div>
+
+          {/* Botón para enviar */}
           <button
-            onClick={handleStartProduction}
-            className={`px-6 py-3 rounded-lg flex items-center gap-2 transition-colors ${
-              isProducing
-                ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                : 'bg-green-100 text-green-700 hover:bg-green-200'
-            }`}
-            disabled={backendUnavailable}
+            type="submit"
+            disabled={isSubmitting}
+            className={`w-full ${isSubmitting ? 'opacity-50 cursor-not-allowed' : 'bg-yellow-500 hover:bg-yellow-600'} text-white font-medium py-2 px-4 rounded-md shadow-sm`}
           >
-            {isProducing ? (
-              <>
-                <Pause className="w-5 h-5" /> Detener
-              </>
-            ) : (
-              <>
-                <Play className="w-5 h-5" /> {currentOrder ? 'Continuar' : 'Seleccionar Pedido'}
-              </>
-            )}
+            {isSubmitting ? 'Procesando...' : 'Iniciar Producción'}
           </button>
-        </div>
-
-        {currentOrder && !backendUnavailable && (
-          <div className="mb-4 bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded-lg">
-            <p className="font-medium">Pedido en Producción</p>
-            <p>Cliente: {currentOrder.client}</p>
-            <p>Progreso: {producedAmount} / {currentOrder.quantity} unidades</p>
-          </div>
-        )}
-
-        {isProducing && !backendUnavailable && (
-          <div className="space-y-4">
-            <div className="h-4 bg-gray-100 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-yellow-400 transition-all duration-100 ease-linear"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-          </div>
-        )}
-      </div>
-
-      {!backendUnavailable && <ProductionMetrics metrics={metrics} />}
-
-      <Suspense fallback={null}>
-        {showOrderModal && (
-          <OrderSelectionModal 
-            isOpen={showOrderModal}
-            onClose={() => setShowOrderModal(false)}
-            onSelect={handleOrderSelect}
-            currentInventory={inventory}
-          />
-        )}
-      </Suspense>
+        </form>
+      )}
     </div>
   );
 }

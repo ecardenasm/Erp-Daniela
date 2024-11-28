@@ -49,9 +49,10 @@ export default function InventoryModule() {
         setError(null);
 
         const [productsResponse, rawResponse] = await Promise.all([
-          InventarioApi<ApiResponse<InventoryItem>>('/products', 'GET'),
-          InventarioApi<ApiResponse<InventoryItem>>('/ingredients', 'GET'),
+          InventarioApi<ApiResponse<InventoryItem>>('/products', { method: 'GET' }), // Usar un objeto con 'method'
+          InventarioApi<ApiResponse<InventoryItem>>('/ingredients', { method: 'GET' }),
         ]);
+        
 
         const mappedProducts = productsResponse.products?.map((product) =>
           mapInventoryItem(product, 'product')

@@ -1,12 +1,8 @@
-import React from 'react';
 import { 
   Factory, 
   Package, 
   Users,
   Citrus,
-  HardHat,
-  Settings,
-  ClipboardList,
   ChevronLeft,
   ChevronRight,
   Sun,
@@ -29,13 +25,12 @@ const themes = [
 export default function Sidebar({ activeModule, onModuleChange }: SidebarProps) {
   const { color, mode, isCollapsed, setColor, setMode, toggleCollapsed } = useThemeStore();
   
+  // Eliminar los módulos "Empleados" y "Maquinaria"
   const modules = [
     { id: 'production', icon: Factory, label: 'Producción' },
-    { id: 'orders', icon: ClipboardList, label: 'Pedidos' },
     { id: 'inventory', icon: Package, label: 'Inventario' },
     { id: 'suppliers', icon: Users, label: 'Proveedores' },
-    { id: 'employees', icon: HardHat, label: 'Empleados' },
-    { id: 'machinery', icon: Settings, label: 'Maquinaria' },
+    // Eliminar empleados y maquinaria
   ];
 
   const getActiveStyles = (moduleId: string) => {
