@@ -97,15 +97,6 @@ export default function InventoryModule() {
           Materia Prima
         </button>
         <button
-          onClick={() => setSelectedType('material')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
-            selectedType === 'material' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100'
-          }`}
-        >
-          <Box className="w-5 h-5" />
-          Materiales
-        </button>
-        <button
           onClick={() => setSelectedType('product')}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
             selectedType === 'product' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100'
