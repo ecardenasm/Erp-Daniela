@@ -1,4 +1,4 @@
-# Proyecto Laura ERP
+# Proyecto Diana ERP
 
 An Enterprise Resource Planning (ERP) system built with React, TypeScript, and Hexagonal Architecture.
 
