@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useThemeStore } from '../store/themeStore';
 import { InventarioApi } from '../infrastructure/adapters/InventarioApiAdapter';
 
 interface InventoryItem {
@@ -16,6 +17,8 @@ export default function LemonadeProductionForm() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
+  const { color, mode } = useThemeStore();
+
   useEffect(() => {
     const fetchProducts = async () => {
       try {
@@ -26,102 +29,97 @@ export default function LemonadeProductionForm() {
         setProducts(response.products || []);
         setError(null);
       } catch (err: any) {
-        setError('Error al cargar los productos.');
+        setError('❌ No pudimos cargar los productos. Revisa tu conexión e inténtalo de nuevo.');
       } finally {
         setLoading(false);
       }
     };
-  
+
     fetchProducts();
   }, []);
 
   const handleFormSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-  
-    // Validaciones antes de enviar
-    console.log('Iniciando validaciones...');
+
     if (!selectedProduct || quantity <= 0) {
-      setError('Por favor, selecciona un producto y especifica una cantidad válida mayor a 0.');
-      console.log('Error de validación: Producto o cantidad no válida');
+      setError('⚠️ Selecciona un producto y especifica una cantidad mayor a 0.');
       return;
     }
-  
-    const productId = parseInt(selectedProduct, 10);
-    const quantityInt = parseInt(String(quantity), 10);
-  
-    if (isNaN(productId) || isNaN(quantityInt) || quantityInt <= 0) {
-      setError('El ID del producto o la cantidad no son válidos.');
-      console.log('Error de validación: ID del producto o cantidad no válidos', { productId, quantityInt });
-      return;
-    }
-  
-    console.log('Datos validados:', { productId, quantityInt });
-  
+
     setIsSubmitting(true);
     setError(null);
-  
+
     try {
-      // Construir la URL con parámetros de consulta
-      const url = `/products/production?product_id=${productId}&quantity=${quantityInt}`;
-      console.log('Construyendo URL:', url);
-  
-      const response = await InventarioApi(url, {
+      const response = await InventarioApi(`/products/production?product_id=${selectedProduct}&quantity=${quantity}`, {
         method: 'POST',
         headers: {
-          'accept': 'application/json',
+          accept: 'application/json',
         },
       });
-  
-      console.log('Respuesta recibida:', response);
-  
-      //if (response.success) {
-        //alert(`Producción iniciada para ${quantityInt} unidades del producto con ID ${productId}`);
-      //} else {
-        //setError('Hubo un error al iniciar la producción. Intenta nuevamente.');
-        //console.log('Error en la respuesta del servidor:', response);
-      //}
+
+      alert('🎉 Producción iniciada exitosamente.');
     } catch (err: any) {
-//      setError('Hubo un error al procesar la solicitud. Intenta nuevamente.');
-      console.error('Error en la solicitud:', err);
+      setError('❌ Hubo un error al procesar tu solicitud. Por favor, inténtalo de nuevo.');
     } finally {
       setIsSubmitting(false);
-      console.log('Proceso finalizado.');
     }
   };
-  
+
+  const getTextColor = () => {
+    const darkTextColors = {
+      yellow: 'text-gray-900',
+      emerald: 'text-gray-100',
+      indigo: 'text-gray-100',
+    };
+
+    const lightTextColors = {
+      yellow: 'text-gray-800',
+      emerald: 'text-gray-900',
+      indigo: 'text-gray-900',
+    };
+
+    return mode === 'dark' ? darkTextColors[color] : lightTextColors[color];
+  };
+
+  const themeClasses = {
+    bg: mode === 'dark' ? `bg-${color}-900` : `bg-${color}-100`,
+    border: mode === 'dark' ? 'border-gray-700' : 'border-gray-300',
+    button: mode === 'dark' ? `bg-${color}-700 hover:bg-${color}-800` : `bg-${color}-500 hover:bg-${color}-600`,
+  };
 
   return (
-    <div className="max-w-lg mx-auto bg-white p-6 rounded-lg shadow-md space-y-6">
-      <h2 className="text-2xl font-semibold text-gray-800">Producción de Limonada</h2>
-      {loading && <p className="text-gray-500">Cargando productos...</p>}
-      {error && <p className="text-red-600">{error}</p>}
+    <div
+      className={`max-w-xl mx-auto p-8 rounded-lg shadow-lg space-y-6 transition-all ${themeClasses.bg} ${getTextColor()}`}
+    >
+      <h2 className="text-3xl font-bold text-center">🍋 Producción de Limonada</h2>
+
+      {loading && <p className="text-center">⏳ Cargando productos...</p>}
+      {error && <p className="text-red-500 font-medium text-center">{error}</p>}
 
       {!loading && !error && (
         <form onSubmit={handleFormSubmit} className="space-y-4">
-          {/* Selección del producto */}
           <div>
-            <label htmlFor="product" className="block text-sm font-medium text-gray-700">
-              Seleccionar producto
+            <label htmlFor="product" className="block text-sm font-medium">
+              Selecciona un producto:
             </label>
             <select
               id="product"
               value={selectedProduct}
               onChange={(e) => setSelectedProduct(e.target.value)}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-yellow-500 focus:ring-yellow-500 sm:text-sm"
+              className={`mt-1 block w-full rounded-lg shadow-sm focus:ring-${color}-500 focus:border-${color}-500 sm:text-sm ${themeClasses.border}`}
             >
               <option value="">-- Selecciona un producto --</option>
               {products.map((product) => (
                 <option key={product.id} value={product.id}>
-                  {product.name}
+                  {product.name} ({product.quantity} {product.unit})
                 </option>
               ))}
             </select>
           </div>
 
-          {/* Cantidad a producir */}
           <div>
-            <label htmlFor="quantity" className="block text-sm font-medium text-gray-700">
-              Cantidad a producir
+            <label htmlFor="quantity" className="block text-sm font-medium">
+              Cantidad a producir:
             </label>
             <input
               type="number"
@@ -129,15 +127,18 @@ export default function LemonadeProductionForm() {
               value={quantity}
               onChange={(e) => setQuantity(Number(e.target.value))}
               min={1}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-yellow-500 focus:ring-yellow-500 sm:text-sm"
+              className={`mt-1 block w-full rounded-lg shadow-sm focus:ring-${color}-500 focus:border-${color}-500 sm:text-sm ${themeClasses.border}`}
             />
           </div>
 
-          {/* Botón para enviar */}
           <button
             type="submit"
             disabled={isSubmitting}
-            className={`w-full ${isSubmitting ? 'opacity-50 cursor-not-allowed' : 'bg-yellow-500 hover:bg-yellow-600'} text-white font-medium py-2 px-4 rounded-md shadow-sm`}
+            className={`w-full py-3 text-lg font-semibold rounded-lg shadow-md text-white transition-all ${
+              isSubmitting
+                ? `bg-${color}-400 cursor-not-allowed opacity-70`
+                : themeClasses.button
+            }`}
           >
             {isSubmitting ? 'Procesando...' : 'Iniciar Producción'}
           </button>
