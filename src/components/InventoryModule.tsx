@@ -114,32 +114,31 @@ export default function InventoryModule() {
         <div className="bg-white p-6 rounded-xl shadow-sm">
           <div className="space-y-4">
             {filteredInventory.map((item) => (
-              <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="flex items-center gap-3">
-                  <Package className="w-6 h-6 text-gray-400" />
-                  <div>
-                    <p className="font-medium">{item.name}</p>
-                    <p className="text-sm text-gray-500">
-                      Mínimo requerido: {item.min} {item.unit}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4">
-                  <p className={`text-lg font-semibold ${getStockStatus(item)}`}>
-                    {item.quantity} / 500 {item.unit}
-                  </p>
-                  <button
-                    onClick={() => setSelectedMaterial(item)}
-                    className="p-2 text-yellow-600 hover:bg-yellow-50 rounded-lg transition-colors"
-                  >
-                    <ShoppingCart className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+  <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg">
+    <div className="flex items-center gap-3">
+      <Package className="w-6 h-6 text-gray-400" />
+      <div>
+        <p className="font-medium">{item.name}</p>
+        <p className="text-sm text-gray-500">
+          Mínimo requerido: {item.min} {item.unit}
+        </p>
+      </div>
+    </div>
+    <div className="flex items-center gap-4">
+      <p className={`text-lg font-semibold ${getStockStatus(item)}`}>
+        {item.quantity} / 500 {item.unit}
+      </p>
+      {item.type !== 'product' && (
+        <button
+          onClick={() => setSelectedMaterial(item)}
+          className="p-2 text-yellow-600 hover:bg-yellow-50 rounded-lg transition-colors"
+        >
+          <ShoppingCart className="w-5 h-5" />
+        </button>
       )}
+    </div>
+  </div>
+))}
 
       {selectedMaterial && (
         <PurchaseOrderModal
